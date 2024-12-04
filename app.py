@@ -4,8 +4,46 @@ from pypdf import PdfReader
 import os
 from docx import Document
 import subprocess
+import markdown
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
+
+@app.route('/extract-text-md', methods=['POST'])
+def extract_md_text():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    if file:
+        filename = secure_filename(file.filename)
+        temp_path = os.path.join('/tmp', filename)
+        file.save(temp_path)
+
+        try:
+            # Extract text from .md file
+            text = extract_text_from_md(temp_path)
+            os.remove(temp_path)  # Remove the file after processing
+            return jsonify({'text': text}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+def extract_text_from_md(filepath):
+    """Extract text from a .md (Markdown) file."""
+    with open(filepath, 'r', encoding='utf-8') as file:
+        md_content = file.read()
+    
+    # Convert Markdown to HTML
+    html_content = markdown.markdown(md_content)
+    
+    # Extract text content from HTML (simple approach using strip_tags)
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    # Return only the text part of the HTML content
+    return soup.get_text()
 
 @app.route('/extract-text-doc', methods=['POST'])
 def upload_file():
